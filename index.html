@@ -6,6 +6,10 @@
     <title>撮影進捗管理 Sync-Lite Pro 2.4.1</title>
 
     <meta name="theme-color" content="#007aff">
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
     <style>
         :root { --bg-color: #f2f2f7; --card-bg: #ffffff; --primary: #007aff; --sync-color: #ffcc00; --danger: #ff3b30; }
         body { font-family: -apple-system, sans-serif; background: var(--bg-color); margin: 0; padding-bottom: 120px; -webkit-user-select: none; }
@@ -37,12 +41,10 @@
             transition: transform 0.1s;
         }
         
-        /* 黄色枠（同期）と直近タップ（青枠）の共存 */
         .group-btn.synced { border: 4px solid var(--sync-color) !important; }
         
-        /* 直近タップの強調表示 */
         .group-btn.last-tapped {
-            outline: 3px solid var(--primary); /* outlineを使うことでボーダーと干渉しにくくする */
+            outline: 3px solid var(--primary);
             outline-offset: -3px;
             box-shadow: 0 0 12px rgba(0, 122, 255, 0.6);
             transform: scale(1.05);
@@ -123,6 +125,13 @@
 </div>
 
 <script>
+    // サービスワーカーの登録（PWA用）
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').then(() => {
+            console.log('Service Worker Registered');
+        });
+    }
+
     let undoStack = null;
     let redoStack = null;
     let state = { config: { classNum: 8, groupNum: 10, groupType: 'num', statusNames: "未,撮影済,要確認,不要" }, data: {}, peerData: {}, lastTappedId: null };
