@@ -16,12 +16,18 @@
         .header { position: sticky; top: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 10px 12px; border-bottom: 1px solid #d1d1d6; z-index: 100; }
         .progress-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; font-weight: bold; margin-bottom: 8px; }
         
-        /* 履歴ボタンのスタイル */
-        .history-controls { display: flex; gap: 20px; margin: 0 10px; }
-        .undo-btn { 
-            font-size: 1.5em; cursor: pointer; opacity: 0.2; pointer-events: none; transition: 0.2s; 
-            background: none; border: none; padding: 0; color: var(--primary);
-        }
+        /* アンドゥ・リドゥボタン：反応を0.1秒（ほぼ瞬時）に */
+.undo-btn { 
+    font-size: 1.5em; 
+    cursor: pointer; 
+    opacity: 0.2; 
+    pointer-events: none; 
+    transition: 0.1s; /* ここを短縮：パッと点灯/消灯します */
+    background: none; 
+    border: none; 
+    padding: 0; 
+    color: var(--primary);
+}
         .undo-btn.active { opacity: 1; pointer-events: auto; }
 
         .progress-container { background: #e5e5ea; border-radius: 3px; height: 6px; margin-bottom: 5px; }
