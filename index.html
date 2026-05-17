@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撮影進捗管理 Sync-Lite Pro 2.4.2</title>
+    <title>撮影進捗管理 Sync-Lite Pro 2.4.3</title>
 
     <meta name="theme-color" content="#007aff">
     
@@ -78,7 +78,7 @@
 
 <div class="header">
     <div class="progress-info">
-        <span>📸 撮影進捗 Ver2.4.2</span>
+        <span>📸 撮影進捗 Ver2.4.3</span>
         <div class="history-controls">
             <button id="undoBtn" class="undo-btn" onclick="undo()" title="戻す">↩️</button>
             <button id="redoBtn" class="undo-btn" onclick="redo()" title="やり直し">↪️</button>
@@ -139,12 +139,12 @@
         });
     }
 
-    let undoStack = null;
-    let redoStack = null;
+    let undoStack = [];
+    let redoStack = [];
     let state = { config: { classNum: 8, groupNum: 10, groupType: 'num', statusNames: "未,撮影済,要確認,不要" }, data: {}, peerData: {}, lastTappedId: null };
 
     window.onload = () => {
-        const saved = localStorage.getItem('sync_lite_pwa_v2.4.2');
+        const saved = localStorage.getItem('sync_lite_pwa_v2.4.3');
         if (saved) {
             state = JSON.parse(saved);
             document.getElementById('classNum').value = state.config.classNum;
@@ -155,7 +155,7 @@
         renderGrid();
     };
 
-    function save() { localStorage.setItem('sync_lite_pwa_v2.4.2', JSON.stringify(state)); }
+    function save() { localStorage.setItem('sync_lite_pwa_v2.4.3', JSON.stringify(state)); }
 
     function setType(type) { state.config.groupType = type; updateToggleUI(); renderGrid(); save(); }
 
@@ -174,7 +174,7 @@
     function resetAllData() {
         if(!confirm("すべてリセットしますか？")) return;
         state.data = {}; state.peerData = {}; state.lastTappedId = null;
-        undoStack = null; redoStack = null;
+        undoStack = []; redoStack = [];
         renderGrid(); save();
     }
 
@@ -246,32 +246,31 @@
 
     function toggleStatus(id, max) {
         triggerHaptic();
-        undoStack = JSON.parse(JSON.stringify(state.data));
-        redoStack = null;
+        undoStack.push(JSON.parse(JSON.stringify(state.data)));
+        if (undoStack.length > 10) undoStack.shift();
+        redoStack = [];
         state.lastTappedId = id;
         state.data[id] = ((state.data[id] || 0) + 1) % max;
         renderGrid(); save();
     }
 
     function undo() {
-        if (!undoStack) return;
-        redoStack = JSON.parse(JSON.stringify(state.data));
-        state.data = JSON.parse(JSON.stringify(undoStack));
-        undoStack = null;
+        if (!undoStack.length) return;
+        redoStack.push(JSON.parse(JSON.stringify(state.data)));
+        state.data = undoStack.pop();
         renderGrid(); save();
     }
 
     function redo() {
-        if (!redoStack) return;
-        undoStack = JSON.parse(JSON.stringify(state.data));
-        state.data = JSON.parse(JSON.stringify(redoStack));
-        redoStack = null;
+        if (!redoStack.length) return;
+        undoStack.push(JSON.parse(JSON.stringify(state.data)));
+        state.data = redoStack.pop();
         renderGrid(); save();
     }
 
     function updateHistoryButtons() {
-        document.getElementById('undoBtn').className = `undo-btn ${undoStack ? 'active' : ''}`;
-        document.getElementById('redoBtn').className = `undo-btn ${redoStack ? 'active' : ''}`;
+        document.getElementById('undoBtn').className = `undo-btn ${undoStack.length ? 'active' : ''}`;
+        document.getElementById('redoBtn').className = `undo-btn ${redoStack.length ? 'active' : ''}`;
     }
 
     function exportData() {
