@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>撮影進捗管理 Sync-Lite Pro 2.4.3</title>
+
+    <meta name="theme-color" content="#007aff">
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        :root { --bg-color: #f2f2f7; --card-bg: #ffffff; --primary: #007aff; --sync-color: #ffcc00; --danger: #ff3b30; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg-color); margin: 0; padding-bottom: 120px; -webkit-user-select: none; }
+        
+        .header { position: sticky; top: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 10px 12px; border-bottom: 1px solid #d1d1d6; z-index: 100; }
+        .progress-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; font-weight: bold; margin-bottom: 8px; }
+        
+        .history-controls { display: flex; gap: 20px; margin: 0 10px; }
+        .undo-btn { 
+            font-size: 1.5em; cursor: pointer; opacity: 0.2; pointer-events: none; transition: 0.1s; /* アンドゥ高速化 */
+            background: none; border: none; padding: 0; color: var(--primary);
+        }
+        .undo-btn.active { opacity: 1; pointer-events: auto; }
+
+        .progress-container { background: #e5e5ea; border-radius: 3px; height: 6px; margin-bottom: 5px; }
+        .progress-bar { background: #34c759; height: 100%; width: 0%; border-radius: 3px; transition: 0.5s; }
+        
+        .filter-bar { display: flex; align-items: center; justify-content: space-between; font-size: 0.85em; font-weight: bold; }
+        .container { padding: 8px; }
+        
+        .class-section { background: var(--card-bg); border-radius: 10px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .class-header { background: #f8f8f8; padding: 10px 12px; font-size: 0.95em; font-weight: bold; border-bottom: 1px solid #eee; }
+        .group-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 12px; }
+
+        .group-btn {
+            height: 52px; background: white; border-radius: 8px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 2px solid #d1d1d6; box-sizing: border-box; position: relative;
+            transition: transform 0.1s;
+        }
+        
+        .group-btn.synced { border: 4px solid var(--sync-color) !important; }
+        
+        .group-btn.last-tapped {
+            outline: 3px solid var(--primary);
+            outline-offset: -3px;
+            box-shadow: 0 0 12px rgba(0, 122, 255, 0.6);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .group-btn .num { font-size: 1.2em; font-weight: bold; }
+        .group-btn .label { font-size: 0.6em; margin-top: 2px; }
+
+        .status-1 { background: #007aff; color: white; border-color: #007aff; }
+        .status-2 { background: #ff3b30; color: white; border-color: #ff3b30; }
+        .status-3 { background: #ff9500; color: white; border-color: #ff9500; }
+        .status-4 { background: #34c759; color: white; border-color: #34c759; }
+
+        .panel { margin-top: 20px; padding: 15px; background: #e5e5ea; border-radius: 12px; font-size: 0.85em; }
+        .panel h3 { margin-top: 0; margin-bottom: 10px; font-size: 1.1em; }
+        
+        textarea { width: 100%; height: 70px; margin: 10px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 0.8em; padding: 8px; box-sizing: border-box; }
+        .btn-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; font-size: 0.95em; }
+        
+        .btn-toggle { background: #fff; color: #333; border: 1px solid #ccc; }
+        .btn-toggle.active { background: #333 !important; color: #fff !important; border: 1px solid #333 !important; }
+        .btn-export { background: #48484a; color: white; }
+        .btn-import { background: var(--primary); color: white; }
+        .btn-save { background: #34c759; color: white; flex: 2; }
+        .btn-reset { background: var(--danger); color: white; flex: 1; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="progress-info">
+        <span>📸 撮影進捗 Ver2.4.3</span>
+        <div class="history-controls">
+            <button id="undoBtn" class="undo-btn" onclick="undo()" title="戻す">↩️</button>
+            <button id="redoBtn" class="undo-btn" onclick="redo()" title="やり直し">↪️</button>
+        </div>
+        <span id="counterText">0 / 0</span>
+    </div>
+    <div class="progress-container"><div id="progressBar" class="progress-bar"></div></div>
+    <div class="filter-bar">
+        <label><input type="checkbox" id="filterUnshot" onchange="renderGrid()"> 未撮影のみ表示</label>
+    </div>
+</div>
+
+<div id="app" class="container"></div>
+
+<div class="container">
+    <div class="panel" style="background: #ddd;">
+        <h3>🛠 基本設定</h3>
+        <label>クラス数</label><input type="number" id="classNum" value="8" style="width:100%; padding:10px; margin-bottom:12px; box-sizing: border-box;">
+        <label>班数</label><input type="number" id="groupNum" value="10" style="width:100%; padding:10px; margin-bottom:12px; box-sizing: border-box;">
+        
+        <label>表示タイプ</label>
+        <div class="btn-row">
+            <button id="typeNum" class="btn-toggle" onclick="setType('num')">1, 2, 3...</button>
+            <button id="typeAlpha" class="btn-toggle" onclick="setType('alpha')">A, B, C...</button>
+        </div>
+        
+        <label>状態名（色順序）</label>
+        <input type="text" id="statusNames" value="未,撮影済,要確認,不要" style="width:100%; padding:10px; box-sizing: border-box;">
+        
+        <div class="btn-row" style="margin-top:15px;">
+            <button class="btn-save" onclick="updateConfigOnly()">設定を保存</button>
+            <button class="btn-reset" onclick="resetAllData()">全リセット</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>🔗 データ共有</h3>
+        <div style="background: #f8f8f8; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 0.82em; line-height: 1.7; color: #333;">
+            <div style="border-left: 3px solid var(--sync-color); padding-left: 8px; margin-bottom: 8px; color: #888; font-size: 0.95em;">
+                黄色い枠線：メンバーから共有された進捗
+            </div>
+            <div>1. 自分のデータを送る：【自分のデータをコピー】して相手に送信。</div>
+            <div>2. 相手のデータを取り込む：届いた文字を下に貼り付けて【相手のデータを反映】。</div>
+        </div>
+        <textarea id="syncData" placeholder="共有されたデータを貼り付け"></textarea>
+        <div class="btn-row">
+            <button class="btn-export" onclick="exportData()">自分のデータをコピー</button>
+            <button class="btn-import" onclick="importData()">相手のデータを反映</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // サービスワーカーの登録（PWA用）
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').then(() => {
+            console.log('Service Worker Registered');
+        });
+    }
+
+    let undoStack = [];
+    let redoStack = [];
+    let state = { config: { classNum: 8, groupNum: 10, groupType: 'num', statusNames: "未,撮影済,要確認,不要" }, data: {}, peerData: {}, lastTappedId: null };
+
+    window.onload = () => {
+        const saved = localStorage.getItem('sync_lite_pwa_v2.4.3');
+        if (saved) {
+            state = JSON.parse(saved);
+            document.getElementById('classNum').value = state.config.classNum;
+            document.getElementById('groupNum').value = state.config.groupNum;
+            document.getElementById('statusNames').value = state.config.statusNames;
+        }
+        updateToggleUI();
+        renderGrid();
+    };
+
+    function save() { localStorage.setItem('sync_lite_pwa_v2.4.3', JSON.stringify(state)); }
+
+    function setType(type) { state.config.groupType = type; updateToggleUI(); renderGrid(); save(); }
+
+    function updateToggleUI() {
+        document.getElementById('typeNum').className = state.config.groupType === 'num' ? 'btn-toggle active' : 'btn-toggle';
+        document.getElementById('typeAlpha').className = state.config.groupType === 'alpha' ? 'btn-toggle active' : 'btn-toggle';
+    }
+
+    function updateConfigOnly() {
+        state.config.classNum = parseInt(document.getElementById('classNum').value);
+        state.config.groupNum = parseInt(document.getElementById('groupNum').value);
+        state.config.statusNames = document.getElementById('statusNames').value;
+        renderGrid(); save(); alert("設定を保存しました。");
+    }
+
+    function resetAllData() {
+        if(!confirm("すべてリセットしますか？")) return;
+        state.data = {}; state.peerData = {}; state.lastTappedId = null;
+        undoStack = []; redoStack = [];
+        renderGrid(); save();
+    }
+
+    function renderGrid() {
+        const container = document.getElementById('app');
+        const filterOn = document.getElementById('filterUnshot').checked;
+        const statusList = state.config.statusNames.split(',');
+        container.innerHTML = '';
+        let total = state.config.classNum * state.config.groupNum;
+        let completed = 0;
+
+        for (let c = 1; c <= state.config.classNum; c++) {
+            const section = document.createElement('div');
+            section.className = 'class-section';
+            section.innerHTML = `<div class="class-header">${c}組</div>`;
+            const grid = document.createElement('div');
+            grid.className = 'group-grid';
+            let visible = 0;
+
+            for (let g = 1; g <= state.config.groupNum; g++) {
+                const id = `c${c}g${g}`;
+                const myVal = state.data[id] || 0;
+                const peerVal = state.peerData[id] || 0;
+                if (myVal > 0 || peerVal > 0) completed++;
+                if (filterOn && (myVal > 0 || peerVal > 0)) continue;
+                visible++;
+
+                const btn = document.createElement('div');
+                const isLast = (state.lastTappedId === id);
+                btn.className = `group-btn status-${myVal} ${peerVal > 0 ? 'synced' : ''} ${isLast ? 'last-tapped' : ''}`;
+                btn.innerHTML = `<div class="num">${state.config.groupType === 'alpha' ? getAlpha(g) : g}</div><div class="label">${statusList[myVal] || ''}</div>`;
+                btn.onclick = () => toggleStatus(id, statusList.length);
+                grid.appendChild(btn);
+            }
+            if (visible > 0 || !filterOn) { section.appendChild(grid); container.appendChild(section); }
+        }
+        document.getElementById('counterText').innerText = `${completed} / ${total}`;
+        document.getElementById('progressBar').style.width = (total > 0 ? (completed / total * 100) : 0) + '%';
+        updateHistoryButtons();
+    }
+
+    function getAlpha(g) {
+        let label = "", num = g;
+        while (num > 0) {
+            let rem = (num - 1) % 26;
+            label = String.fromCharCode(65 + rem) + label;
+            num = Math.floor((num - 1) / 26);
+        }
+        return label;
+    }
+
+    function triggerHaptic() {
+        if (navigator.vibrate) {
+            navigator.vibrate(30);
+            return;
+        }
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            gain.gain.setValueAtTime(0.001, ctx.currentTime);
+            osc.frequency.setValueAtTime(200, ctx.currentTime);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.03);
+        } catch(e) {}
+    }
+
+    function toggleStatus(id, max) {
+        triggerHaptic();
+        undoStack.push(JSON.parse(JSON.stringify(state.data)));
+        if (undoStack.length > 10) undoStack.shift();
+        redoStack = [];
+        state.lastTappedId = id;
+        state.data[id] = ((state.data[id] || 0) + 1) % max;
+        renderGrid(); save();
+    }
+
+    function undo() {
+        if (!undoStack.length) return;
+        redoStack.push(JSON.parse(JSON.stringify(state.data)));
+        state.data = undoStack.pop();
+        renderGrid(); save();
+    }
+
+    function redo() {
+        if (!redoStack.length) return;
+        undoStack.push(JSON.parse(JSON.stringify(state.data)));
+        state.data = redoStack.pop();
+        renderGrid(); save();
+    }
+
+    function updateHistoryButtons() {
+        document.getElementById('undoBtn').className = `undo-btn ${undoStack.length ? 'active' : ''}`;
+        document.getElementById('redoBtn').className = `undo-btn ${redoStack.length ? 'active' : ''}`;
+    }
+
+    function exportData() {
+        const str = btoa(JSON.stringify(state.data));
+        navigator.clipboard.writeText(str).then(() => alert("コピーしました！"));
+    }
+
+    function importData() {
+        const input = document.getElementById('syncData').value.trim();
+        if (!input) return;
+        try {
+            const received = JSON.parse(atob(input));
+            for (let id in received) {
+                if ((received[id] || 0) > (state.peerData[id] || 0)) state.peerData[id] = received[id];
+            }
+            renderGrid(); save(); alert("同期完了！");
+            document.getElementById('syncData').value = "";
+        } catch (e) { alert("データが正しくありません。"); }
+    }
+</script>
+</body>
+</html>
