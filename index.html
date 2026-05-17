@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撮影進捗管理 Sync-Lite Pro 2.4.1</title>
+    <title>撮影進捗管理 Sync-Lite Pro 2.4.2</title>
 
     <meta name="theme-color" content="#007aff">
     
@@ -78,7 +78,7 @@
 
 <div class="header">
     <div class="progress-info">
-        <span>📸 撮影進捗 Ver2.4.1</span>
+        <span>📸 撮影進捗 Ver2.4.2</span>
         <div class="history-controls">
             <button id="undoBtn" class="undo-btn" onclick="undo()" title="戻す">↩️</button>
             <button id="redoBtn" class="undo-btn" onclick="redo()" title="やり直し">↪️</button>
@@ -116,6 +116,13 @@
 
     <div class="panel">
         <h3>🔗 データ共有</h3>
+        <div style="background: #f8f8f8; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 0.82em; line-height: 1.7; color: #333;">
+            <div style="border-left: 3px solid var(--sync-color); padding-left: 8px; margin-bottom: 8px; color: #888; font-size: 0.95em;">
+                黄色い枠線：メンバーから共有された進捗
+            </div>
+            <div>1. 自分のデータを送る：【自分のデータをコピー】して相手に送信。</div>
+            <div>2. 相手のデータを取り込む：届いた文字を下に貼り付けて【相手のデータを反映】。</div>
+        </div>
         <textarea id="syncData" placeholder="共有されたデータを貼り付け"></textarea>
         <div class="btn-row">
             <button class="btn-export" onclick="exportData()">自分のデータをコピー</button>
@@ -137,7 +144,7 @@
     let state = { config: { classNum: 8, groupNum: 10, groupType: 'num', statusNames: "未,撮影済,要確認,不要" }, data: {}, peerData: {}, lastTappedId: null };
 
     window.onload = () => {
-        const saved = localStorage.getItem('sync_lite_pwa_v2.4.1');
+        const saved = localStorage.getItem('sync_lite_pwa_v2.4.2');
         if (saved) {
             state = JSON.parse(saved);
             document.getElementById('classNum').value = state.config.classNum;
@@ -148,7 +155,7 @@
         renderGrid();
     };
 
-    function save() { localStorage.setItem('sync_lite_pwa_v2.4.1', JSON.stringify(state)); }
+    function save() { localStorage.setItem('sync_lite_pwa_v2.4.2', JSON.stringify(state)); }
 
     function setType(type) { state.config.groupType = type; updateToggleUI(); renderGrid(); save(); }
 
@@ -219,7 +226,26 @@
         return label;
     }
 
+    function triggerHaptic() {
+        if (navigator.vibrate) {
+            navigator.vibrate(30);
+            return;
+        }
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            gain.gain.setValueAtTime(0.001, ctx.currentTime);
+            osc.frequency.setValueAtTime(200, ctx.currentTime);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.03);
+        } catch(e) {}
+    }
+
     function toggleStatus(id, max) {
+        triggerHaptic();
         undoStack = JSON.parse(JSON.stringify(state.data));
         redoStack = null;
         state.lastTappedId = id;
